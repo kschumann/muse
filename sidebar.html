@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+    <style>
+      body {
+        /* display:flex;
+        justify-content:center;
+        margin-top:5rem;   */
+      }
+
+
+      .dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background-color: #555;
+      }
+
+      .container {
+        display:none;
+        height:15px;
+        width: 50px;
+        margin:50px auto 0;
+
+      }
+
+      #response {
+        display:block;
+      }
+
+      #display-container{
+        margin:5px;
+        padding:5px;
+      }
+
+      .container .dot:nth-last-child(1) {
+        animation: jumpingAnimation 1.2s 0.2s ease-in infinite;
+      }
+      .container .dot:nth-last-child(2) {
+        animation: jumpingAnimation 1.2s 0.4s ease-in infinite;
+      }
+      .container .dot:nth-last-child(3) {
+        animation: jumpingAnimation 1.2s 0.6s ease-in infinite;
+      }
+
+      @keyframes jumpingAnimation {
+        0 {
+          transform: translate(0, 0);
+        }
+        16% {
+          transform: translate(0, -15px);
+        }
+        33% {
+          transform: translate(0, 0);
+        }
+        100% {
+          transform: translate(0, 0);
+        }
+      }
+
+      img{
+        width:100%;
+      }
+
+      #prompt-display{
+        font-style:italic;
+      }
+
+          </style>
+
+  </head>
+  <body onload="google.script.run.withSuccessHandler(showCounter).getChatLength();">
+    <div id="display-container">
+      <p> 
+        <!--<input class="actionButton" type="button" value="Add Thread to Doc" onclick="addThreadToDoc();" />
+        <input class="actionButton" type="button" value="Clear Thread" onclick="google.script.run.withSuccessHandler(clearChat).deleteProperties();" />-->
+        <a class="actionButton" href="#"  onclick="addThreadToDoc();">Add Thread to Doc</a>
+        <span> | </span>
+        <a class="actionButton" href="#"  onclick="google.script.run.withSuccessHandler(clearChat).deleteProperties();">Clear Thread</a>
+        <br />
+        <span>Length of thread: </span>
+        <span id="chatLength"></span> 
+      </p>
+      <textarea id="prompt" cols="35" rows="5"></textarea>
+      <p>
+        <input class="action" type="button" id="chat" value="Get Response" onclick="submitRequest(document.getElementById('prompt').value,'chat');" />
+       <!-- <input class="action" type="button" id="edits" value="Suggest Revisions" onclick="google.script.run.suggestRevisions();" />-->
+       <!-- <input class="action" type="button" id="image" value="Get Image" onclick="submitRequest(document.getElementById('prompt').value,'image');" />-->
+      </p>
+      <hr />
+      <p id="prompt-display"></p>
+      <p id="response"></p>
+      <div id="container" class="container">
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+      </div>
+    </div>
+
+  <script>
+    function addThreadToDoc(){
+    google.script.run.addThreadToDoc();
+    clearChat();
+    }
+    function showCounter(chatLength){
+      const len = chatLength/2;
+     document.getElementById("chatLength").innerHTML = len;
+    }
+
+    function useResponse(response){
+      const parser = new DOMParser(); 
+      const responseDoc = parser.parseFromString(response, 'text/html'); 
+      const imgTag = responseDoc.getElementsByTagName('img')[0];
+      if(imgTag){
+        const srcValue = imgTag.getAttribute('src');
+        google.script.run.withSuccessHandler(clearChat).insertImage(srcValue);
+      } else{
+         google.script.run.withSuccessHandler(clearChat).insertResponse(response);
+      }
+    }
+
+    function submitRequest(prompt,type){
+      if(prompt){
+        let buttons = document.getElementsByClassName("actionButton");
+        for(let i=0;i<buttons.length;i++){
+          buttons[i].disabled=true;
+          }
+        document.getElementById("prompt-display").innerHTML = document.getElementById("prompt").value;
+        document.getElementById("prompt").value = "";
+        document.getElementById("response").style.display = "none";      
+        document.getElementById("container").style.display = "block";
+        if(type == "chat"){
+          google.script.run.withSuccessHandler(showResponse).getChatCompletion(prompt);
+        }
+        if(type == "image"){
+          google.script.run.withSuccessHandler(showImage).createImage(prompt);
+        }
+      }
+    }
+
+    function showResponse(completion){
+      const completionP = "<p id='completion'>" + completion + "</p>";
+     const button = "<input id='addToDoc' type='button' value='Add Response to Doc' onclick='useResponse(document.getElementById(\"completion\").innerHTML);' />";     
+      document.getElementById('response').innerHTML =   completionP + button;
+      document.getElementById("container").style.display = "none";        
+      document.getElementById("response").style.display = "block";     
+      let buttons = document.getElementsByClassName("actionButton");
+        for(let i=0;i<buttons.length;i++){
+          buttons[i].disabled=false;
+          }
+      google.script.run.withSuccessHandler(showCounter).getChatLength();
+    }
+
+    function showImage(imageUrl){  
+      if(imageUrl.slice(0,5) == "Error"){
+        document.getElementById('response').innerHTML = imageUrl;
+      } else {
+        const completion = "<img src='" + imageUrl + "' alt='Generated Image' >"        
+        const completionP = "<p id='completion'>" + completion + "</p>";        
+        const button = "<input id='addToDoc' type='button' value='Add Response to Doc' onclick='useResponse(document.getElementById(\"completion\").innerHTML);' />";             
+      document.getElementById('response').innerHTML =   completionP + button;
+      }
+      document.getElementById("container").style.display = "none";        
+      document.getElementById("response").style.display = "block"; 
+      let buttons = document.getElementsByClassName("actionButton");
+        for(let i=0;i<buttons.length;i++){
+          buttons[i].disabled=false;
+        }           
+    }
+
+    function clearChat(){
+     document.getElementById("prompt-display").innerHTML = "";
+      document.getElementById("response").innerHTML = "";
+      google.script.run.withSuccessHandler(showCounter).getChatLength();
+    }
+  </script>
+  </body>
+</html>
