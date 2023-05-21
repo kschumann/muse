@@ -1,14 +1,55 @@
-var token = "";
-var model = "gpt-3.5-turbo";
-var maxTokens = 1000;//max 2048
+var maxTokens = 2048;//max 2048
 var temperature = 1; //0 to 2 higher values more random
 var frequencyPenalty = 0.5; //-2 to 2
 var presencePenalty = 0.5; //-2 to 2
 
-/**Ask questions in Chat format**/
 
-function getChatCompletion(prompt) {
+function setUserProps(token,model){
+  PropertiesService.getUserProperties().setProperties({"token":token,"model":model});
+}
+
+function getProperties(){
+  let counter = 0;
+  let messageProps = PropertiesService.getDocumentProperties().getProperties();
+  for (key in messageProps){
+    counter = counter + 1;
+  }
+  let userProps = PropertiesService.getUserProperties().getProperties();  
+  const token = userProps["token"];
+  const model = userProps["model"];
+  return [token,model,counter];
+}
+
+function cleanseInput(input){
+  if(input){
+    return input.replace(/['"\n\r]+/g,'');
+    } else{
+    return "";
+  }
+  }
+
+function addThreadToDoc(){
+  let convo = [];
+  let messageProps = PropertiesService.getDocumentProperties().getProperties();
+  for (key in messageProps){
+   let item = JSON.parse(messageProps[key]);
+   convo.push(item["content"])
+  }
+  //convo.reverse();
+ convo.forEach(item => insertResponse(item + "\r"));
+}
+
+/**Ask questions in Chat format**/
+function askQuestion(){
+  const prompt = "How old am I?"
+  getChatCompletion(prompt);
+}
+
+function getChatCompletion(context,prompt) {
   try{
+    const variables = getProperties();
+    const token = variables[0];
+    const model = variables[1];
     prompt = cleanseInput(prompt);
     let counter = 0;
     const url = 'https://api.openai.com/v1/chat/completions';
@@ -19,7 +60,7 @@ function getChatCompletion(prompt) {
         "frequency_penalty":frequencyPenalty,
         "presence_penalty":presencePenalty,
         "messages": [
-          {"role": "system", "content": "You are a friendly assistant."}
+          {"role": "system", "content": context}
         ],
       }
 
@@ -32,11 +73,11 @@ function getChatCompletion(prompt) {
     PropertiesService.getDocumentProperties().setProperty(counter,'{"role": "user", "content":"' +  prompt + '"}');
 
     data["messages"].push({"role": "user", "content": prompt});
-
+    console.log(data);
     const params = {
       'method':'post',
       'contentType':'application/json',
-      'headers':{Authorization:"Bearer "+token},
+      'headers':{Authorization:"Bearer " + token},
       'payload' : JSON.stringify(data), 
       'muteHttpExceptions':false
     };
@@ -64,35 +105,6 @@ function insertResponse(response){
 function deleteProperties(){
   PropertiesService.getDocumentProperties().deleteAllProperties();
 }
-
-function getChatLength(){
-  let counter = 0;
-  let messageProps = PropertiesService.getDocumentProperties().getProperties();
-  for (key in messageProps){
-    counter = counter + 1;
-  }
-  return counter
-}
-
-function cleanseInput(input){
-  if(input){
-  return input.replace(/['"\n\r]+/g,'');
-  } else{
-    return "";
-  }
-}
-
-function addThreadToDoc(){
-  let convo = [];
-  let messageProps = PropertiesService.getDocumentProperties().getProperties();
-  for (key in messageProps){
-   let item = JSON.parse(messageProps[key]);
-   convo.push(item["content"])
-  }
-  //convo.reverse();
- convo.forEach(item => insertResponse(item + "\r"));
-}
-
 
 function onOpen() {
   DocumentApp.getUi().createMenu("Muse")
