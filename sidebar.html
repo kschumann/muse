@@ -24,7 +24,6 @@
         height:15px;
         width: 50px;
         margin:50px auto 0;
-
       }
 
       #response {
@@ -36,6 +35,12 @@
         padding:5px;
       }
 
+      #settings-container{
+        margin:5px;
+        padding:5px;
+        display:none;
+      }
+      
       .container .dot:nth-last-child(1) {
         animation: jumpingAnimation 1.2s 0.2s ease-in infinite;
       }
@@ -61,35 +66,38 @@
         }
       }
 
-      img{
-        width:100%;
-      }
-
       #prompt-display{
         font-style:italic;
       }
 
-          </style>
+      label {
+        font-weight:bold;
+      }
 
+      #nav{
+        margin-left:5px;
+        margin-bottom:20px;
+      }
+          </style>
   </head>
-  <body onload="google.script.run.withSuccessHandler(showCounter).getChatLength();">
+  <body onload="google.script.run.withSuccessHandler(showProperties).getProperties();">
     <div id="display-container">
-      <p> 
-        <!--<input class="actionButton" type="button" value="Add Thread to Doc" onclick="addThreadToDoc();" />
-        <input class="actionButton" type="button" value="Clear Thread" onclick="google.script.run.withSuccessHandler(clearChat).deleteProperties();" />-->
-        <a class="actionButton" href="#"  onclick="addThreadToDoc();">Add Thread to Doc</a>
-        <span> | </span>
-        <a class="actionButton" href="#"  onclick="google.script.run.withSuccessHandler(clearChat).deleteProperties();">Clear Thread</a>
+      <p id="nav"> 
+        <input type="button" class="secondary" value="Clear Thread"  onclick="google.script.run.withSuccessHandler(clearChat).deleteProperties();">
+        <input  id="settings" class="secondary" type="button" value="Settings"  onclick="showSettings();" >    
         <br />
+
         <span>Length of thread: </span>
         <span id="chatLength"></span> 
       </p>
-      <textarea id="prompt" cols="35" rows="5"></textarea>
+      <textarea placeholder="The role that ChatGPT should take.  e.g. You are a friendly assistant." id="context" cols="35" rows="2">You are a friendly assistant.</textarea>     
+      <textarea placeholder="Your Prompt" id="prompt" cols="35" rows="5"></textarea>
       <p>
-        <input class="action" type="button" id="chat" value="Get Response" onclick="submitRequest(document.getElementById('prompt').value,'chat');" />
+        <input class="action" type="button" id="chat" value="Get Response" onclick="submitRequest(document.getElementById('context').value,document.getElementById('prompt').value);" />
        <!-- <input class="action" type="button" id="edits" value="Suggest Revisions" onclick="google.script.run.suggestRevisions();" />-->
        <!-- <input class="action" type="button" id="image" value="Get Image" onclick="submitRequest(document.getElementById('prompt').value,'image');" />-->
       </p>
+      <span id="missingSettings"></span>
       <hr />
       <p id="prompt-display"></p>
       <p id="response"></p>
@@ -99,15 +107,57 @@
         <div class="dot"></div>
       </div>
     </div>
-
+    <div id="settings-container">  
+        <p>
+         <label for="token">Chat GPT API Token</label><br />
+         <textarea id="token" name="token" type="text" cols="35" rows="3"></textarea>
+         <br /><br/>
+         <label for="model">Chat GPT Model</label><br />
+         <select id="model" name="model">
+          <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+          <option value="gpt-4">gpt-4</option>
+        </select>          
+        </p>
+        <input class="action" type="button" id="saveSettings" value="Save and Close" onclick="saveSettings();" />       
+    </div>
   <script>
+    function saveSettings(){
+      const token = document.getElementById('token').value;
+      const model = document.getElementById('model').value;
+      google.script.run.withSuccessHandler(showChat).setUserProps(token,model);
+      google.script.run.withSuccessHandler(showProperties).getProperties();
+    }
+
+    function showSettings(){
+      document.getElementById("display-container").style.display = "none";
+      document.getElementById("settings-container").style.display = "block";
+    }
+
+     function showChat(){
+      document.getElementById("settings-container").style.display = "none";
+      document.getElementById("display-container").style.display = "block";
+    }   
+
     function addThreadToDoc(){
     google.script.run.addThreadToDoc();
     clearChat();
     }
-    function showCounter(chatLength){
+
+    function showProperties(props){
+      const chatLength = props[2];
       const len = chatLength/2;
-     document.getElementById("chatLength").innerHTML = len;
+      document.getElementById("chatLength").innerHTML = len;
+
+      const token = document.getElementById('token').value = props[0];
+      const model = document.getElementById('model').value = props[1];      
+      if(!(props[0] && props[1])){
+        document.getElementById('chat').style.disabled = true;
+        document.getElementById('missingSettings').innerHTML = "Please go to Settings to enter ChatGPT details."
+
+      } else{
+        document.getElementById('chat').style.disabled = false;  
+        document.getElementById('missingSettings').innerHTML = "";      
+      }
     }
 
     function useResponse(response){
@@ -122,8 +172,8 @@
       }
     }
 
-    function submitRequest(prompt,type){
-      if(prompt){
+    function submitRequest(context,prompt){
+      if(prompt && context){
         let buttons = document.getElementsByClassName("actionButton");
         for(let i=0;i<buttons.length;i++){
           buttons[i].disabled=true;
@@ -132,49 +182,28 @@
         document.getElementById("prompt").value = "";
         document.getElementById("response").style.display = "none";      
         document.getElementById("container").style.display = "block";
-        if(type == "chat"){
-          google.script.run.withSuccessHandler(showResponse).getChatCompletion(prompt);
-        }
-        if(type == "image"){
-          google.script.run.withSuccessHandler(showImage).createImage(prompt);
-        }
+        google.script.run.withSuccessHandler(showResponse).getChatCompletion(context,prompt);
       }
     }
 
     function showResponse(completion){
       const completionP = "<p id='completion'>" + completion + "</p>";
-     const button = "<input id='addToDoc' type='button' value='Add Response to Doc' onclick='useResponse(document.getElementById(\"completion\").innerHTML);' />";     
-      document.getElementById('response').innerHTML =   completionP + button;
+      const button = "<input id='addToDoc' class='secondary' type='button' value='Add Response to Doc' onclick='useResponse(document.getElementById(\"completion\").innerHTML);'><br />";     
+      const button2 =  "<input type='button' class='secondary' value='Add Thread to Doc'  onclick='addThreadToDoc();'>";
+      document.getElementById('response').innerHTML =   completionP + button+button2;
       document.getElementById("container").style.display = "none";        
       document.getElementById("response").style.display = "block";     
       let buttons = document.getElementsByClassName("actionButton");
         for(let i=0;i<buttons.length;i++){
           buttons[i].disabled=false;
           }
-      google.script.run.withSuccessHandler(showCounter).getChatLength();
-    }
-
-    function showImage(imageUrl){  
-      if(imageUrl.slice(0,5) == "Error"){
-        document.getElementById('response').innerHTML = imageUrl;
-      } else {
-        const completion = "<img src='" + imageUrl + "' alt='Generated Image' >"        
-        const completionP = "<p id='completion'>" + completion + "</p>";        
-        const button = "<input id='addToDoc' type='button' value='Add Response to Doc' onclick='useResponse(document.getElementById(\"completion\").innerHTML);' />";             
-      document.getElementById('response').innerHTML =   completionP + button;
-      }
-      document.getElementById("container").style.display = "none";        
-      document.getElementById("response").style.display = "block"; 
-      let buttons = document.getElementsByClassName("actionButton");
-        for(let i=0;i<buttons.length;i++){
-          buttons[i].disabled=false;
-        }           
+      google.script.run.withSuccessHandler(showProperties).getProperties();
     }
 
     function clearChat(){
      document.getElementById("prompt-display").innerHTML = "";
       document.getElementById("response").innerHTML = "";
-      google.script.run.withSuccessHandler(showCounter).getChatLength();
+      google.script.run.withSuccessHandler(showProperties).getProperties();
     }
   </script>
   </body>
